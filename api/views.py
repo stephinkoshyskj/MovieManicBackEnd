@@ -8,6 +8,26 @@ import requests
 from .models import UserMovie
 from .serializers import UserSerializer, UserMovieSerializer
 
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+def get_tmdb_session():
+    session = requests.Session()
+
+    retries = Retry(
+        total=3,
+        backoff_factor=1,
+        status_forcelist=[500, 502, 503, 504],
+        allowed_methods=["GET"]
+    )
+
+    adapter = HTTPAdapter(max_retries=retries)
+    session.mount("https://", adapter)
+
+    return session
+
+
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     permission_classes = (AllowAny,)
@@ -72,50 +92,77 @@ class MovieStatusView(APIView):
             return Response(UserMovieSerializer(movie).data, status=status.HTTP_201_CREATED)
 
 class TMDBTrendingView(APIView):
-    permission_classes = (AllowAny,) # Or IsAuthenticated based on requirements
+    permission_classes = (AllowAny,)
+    authentication_classes = []
 
     def get(self, request):
         api_key = settings.TMDB_API_KEY
-        if not api_key:
-            return Response({'error': 'TMDB API key not configured on server'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
         try:
-            response = requests.get(f"https://api.themoviedb.org/3/trending/movie/day?api_key={api_key}")
+            session = get_tmdb_session()
+            response = session.get(
+                "https://api.themoviedb.org/3/trending/movie/day",
+                params={"api_key": api_key},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10
+            )
+
             response.raise_for_status()
             return Response(response.json())
-        except requests.RequestException as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
 
 class TMDBSearchView(APIView):
     permission_classes = (AllowAny,)
+    authentication_classes = []
 
     def get(self, request):
         api_key = settings.TMDB_API_KEY
         query = request.query_params.get('query', '')
-        
-        if not api_key:
-            return Response({'error': 'TMDB API key not configured on server'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         if not query:
-            return Response({'error': 'Search query is required'}, status=status.HTTP_400_BAD_REQUEST)
-            
+            return Response({'error': 'Search query is required'}, status=400)
+
         try:
-            response = requests.get(f"https://api.themoviedb.org/3/search/movie?api_key={api_key}&query={query}")
+            session = get_tmdb_session()
+            response = session.get(
+                "https://api.themoviedb.org/3/search/movie",
+                params={
+                    "api_key": api_key,
+                    "query": query
+                },
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10
+            )
+
             response.raise_for_status()
             return Response(response.json())
-        except requests.RequestException as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
 
 class TMDBMovieDetailsView(APIView):
     permission_classes = (AllowAny,)
+    authentication_classes = []
 
     def get(self, request, movie_id):
         api_key = settings.TMDB_API_KEY
-        if not api_key:
-            return Response({'error': 'TMDB API key not configured on server'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
+
         try:
-            response = requests.get(f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={api_key}&append_to_response=credits,videos")
+            session = get_tmdb_session()
+            response = session.get(
+                f"https://api.themoviedb.org/3/movie/{movie_id}",
+                params={
+                    "api_key": api_key,
+                    "append_to_response": "credits,videos"
+                },
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10
+            )
+
             response.raise_for_status()
             return Response(response.json())
-        except requests.RequestException as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
