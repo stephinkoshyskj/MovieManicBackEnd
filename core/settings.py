@@ -153,9 +153,10 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React dev
-    "https://yourdomain.com", # React production
+    "https://moviemaniac-nexus.vercel.app",  # React production
 ]
 
+
 CSRF_TRUSTED_ORIGINS = [
-    "https://yourdomain.com",
+    "https://moviemaniac-nexus.vercel.app",
 ]
